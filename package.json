@@ -1,14 +1,14 @@
 {
   "name": "dashbet-api",
   "version": "1.0.0",
-  "description": "Dashbet Keno Live Production Server",
+  "description": "Dashbet Keno Live Server on Vercel",
   "main": "admin_server.js",
   "scripts": {
     "start": "node admin_server.js"
   },
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.19.2",
+    "cors": "^2.8.5",
     "mongoose": "^8.3.1"
   }
 }

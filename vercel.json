@@ -3,10 +3,17 @@
   "builds": [
     {
       "src": "admin_server.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["Dashbet3.html", "admin.html"]
+      }
     }
   ],
   "routes": [
+    {
+      "src": "/admin-panel",
+      "dest": "admin_server.js"
+    },
     {
       "src": "/(.*)",
       "dest": "admin_server.js"

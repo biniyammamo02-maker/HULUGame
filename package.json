@@ -1,0 +1,14 @@
+{
+  "name": "dashbet-api",
+  "version": "1.0.0",
+  "description": "Dashbet Keno Live Production Server",
+  "main": "admin_server.js",
+  "scripts": {
+    "start": "node admin_server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.3.1"
+  }
+}

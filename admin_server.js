@@ -4,25 +4,19 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 
 const app = express();
-// Render አውቶማቲክ ፖርት እንዲሰጠው ማድረግ
 const PORT = process.env.PORT || 5000; 
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
-// Render ላይ MONGO_URI የተባለውን የክላውድ ዳታቤዝ ሊንክ ማንበቢያ
+// ክላውድ ዳታቤዝ ማገናኛ
 const MONGO_URI = process.env.MONGO_URI;
-
-if (!MONGO_URI) {
-    console.error("⚠️ ስህተት፦ MONGO_URI በሬንደር Environment Variables ላይ አልተጫነም!");
-    process.exit(1);
+if (MONGO_URI) {
+    mongoose.connect(MONGO_URI)
+        .then(() => console.log('✅ Connected to MongoDB Atlas'))
+        .catch(err => console.error('❌ DB Error:', err));
 }
-
-// ከክላውድ MongoDB Atlas ጋር ማገናኛ
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ ከክላውድ MongoDB Atlas ጋር በስኬት ተገናኝቷል!'))
-    .catch(err => console.error('❌ የዳታቤዝ ግንኙነት ስህተት፦', err));
 
 // ----------------- የክላውድ ሞዴሎች (MONGOOSE SCHEMAS) -----------------
 const userSchema = new mongoose.Schema({
@@ -47,10 +41,13 @@ const historySchema = new mongoose.Schema({
 });
 const History = mongoose.model('History', historySchema);
 
-// ----------------- የገጾች ማሳያ መንገዶች -----------------
-const playerFilePath = path.join(__dirname, 'Dashbet3.html'); // የፋይል ስም ስህተቱ ተስተካክሏል
-app.get('/', (req, res) => { res.sendFile(playerFilePath); });
-app.get('/admin-panel', (req, res) => { res.sendFile(path.join(__dirname, 'admin.html')); });
+// ----------------- 🎯 ማስተካከያ፦ የገጾች መክፈቻ መስመሮች (Vercel Fix) -----------------
+app.get('/', (req, res) => { 
+    res.sendFile(path.join(process.cwd(), 'Dashbet3.html')); 
+});
+app.get('/admin-panel', (req, res) => { 
+    res.sendFile(path.join(process.cwd(), 'admin.html')); 
+});
 
 // ----------------- ኤፒአይ መንገዶች (API ROUTES) -----------------
 app.post('/login', async (req, res) => {
@@ -73,7 +70,7 @@ app.post('/register', async (req, res) => {
     try {
         const existing = await User.findOne({ phone });
         if (existing) return res.json({ success: false, message: "❌ ይህ ስልክ ቁጥር ቀድሞ የተመዘገበ ነው!" });
-        const newUser = new User({ phone, password, balance: 1803.00 }); // የመጀመሪያው ተጫዋች ባክአፕ ባላንስ
+        const newUser = new User({ phone, password, balance: 1803.00 });
         await newUser.save();
         res.json({ success: true, message: "✅ ምዝገባዎ በቋሚነት ተጠናቋል! አሁን መግባት ይችላሉ።" });
     } catch(e) { res.json({ success: false }); }
@@ -132,18 +129,14 @@ app.post('/api/withdraw', async (req, res) => {
         const cleanPhone = userPhone.trim();
         const user = await User.findOne({ phone: cleanPhone });
         if (!user) return res.json({ success: false, message: "❌ ተጠቃሚው አልተገኘም!" });
-
         const reqAmount = parseFloat(amount);
         if (reqAmount < 80) return res.json({ success: false, message: "❌ ማውጣት የሚቻለው አነስተኛ መጠን 80 ETB ነው!" });
-
         const pendings = await Withdraw.find({ userPhone: cleanPhone, status: 'PENDING' });
         const pendingWithdrawAmount = pendings.reduce((sum, w) => sum + w.amount, 0);
         const availableToWithdraw = user.balance - pendingWithdrawAmount;
-
         if (reqAmount > availableToWithdraw) {
-            return res.json({ success: false, message: `❌ በቂ ቀሪ ሂሳብ የሎትም! ማውጣት የሚችሉት ከፍተኛ መጠን፦ ${Math.max(0, availableToWithdraw).toFixed(2)} ETB` });
+            return res.json({ success: false, message: `❌ በቂ ቀሪ ሂሳብ የሎትም!` });
         }
-        
         const newWith = new Withdraw({ id: 'WITH-' + Date.now(), userPhone: cleanPhone, amount: reqAmount, accountNumber, fullName, method, status: 'PENDING', date: new Date().toLocaleString('am-ET') });
         await newWith.save();
         res.json({ success: true, message: "✅ የዊዝድሮው ጥያቄዎ በተሳካ ሁኔታ ለአድሚን ተልኳል!" });
@@ -159,9 +152,7 @@ app.post('/admin/process-deposit', async (req, res) => {
             dep.status = 'APPROVED';
             const user = await User.findOne({ phone: dep.userPhone });
             if (user) { user.balance += dep.amount; await user.save(); }
-        } else {
-            dep.status = 'REJECTED';
-        }
+        } else { dep.status = 'REJECTED'; }
         await dep.save();
         res.json({ success: true });
     } catch(e) { res.json({ success: false }); }
@@ -178,12 +169,8 @@ app.post('/admin/process-withdrawal', async (req, res) => {
                 wit.status = 'APPROVED';
                 user.balance -= wit.amount;
                 await user.save();
-            } else {
-                return res.json({ success: false, message: "❌ በቂ ቀሪ ሂሳብ የለም!" });
-            }
-        } else {
-            wit.status = 'REJECTED';
-        }
+            } else { return res.json({ success: false, message: "❌ በቂ ቀሪ ሂሳብ የለም!" }); }
+        } else { wit.status = 'REJECTED'; }
         await wit.save();
         res.json({ success: true });
     } catch(e) { res.json({ success: false }); }
@@ -203,6 +190,4 @@ app.get('/admin/deposits', async (req, res) => { try { const d = await Deposit.f
 app.get('/admin/withdrawals', async (req, res) => { try { const w = await Withdraw.find({}); res.json(w); } catch(e) {res.json([]);} });
 app.get('/admin/users', async (req, res) => { try { const u = await User.find({}); res.json(u); } catch(e) {res.json([]);} });
 
-app.listen(PORT, () => {
-    console.log(`🚀 ሰርቨሩ በፖርት ${PORT} ላይ በስኬት ተነስቷል!`);
-});
+module.exports = app;
